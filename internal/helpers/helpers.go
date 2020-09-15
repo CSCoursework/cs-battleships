@@ -13,3 +13,7 @@ func ClearConsole() {
 func GetAlphabetChar(i int) string {
 	return string(rune(int('A') + i))
 }
+
+func GetCharNumber(i string) int {
+	return int([]rune(i)[0]) - int('A')
+}

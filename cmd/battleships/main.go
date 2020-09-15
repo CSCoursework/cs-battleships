@@ -1,20 +1,14 @@
 package main
 
 import (
-	"github.com/codemicro/cs-battleships/internal/display"
 	"github.com/codemicro/cs-battleships/internal/game"
-)
-
-const (
-	oceanWidth  = 10
-	oceanHeight = 10
+	"github.com/codemicro/cs-battleships/internal/io"
 )
 
 func init() {
-	game.Ocean = game.CreateOcean(oceanWidth, oceanHeight)
-	display.DisplayOcean(game.Ocean)
+	game.Ocean = game.CreateOcean(io.OceanWidth, io.OceanHeight)
 }
 
 func main() {
-
+	game.Start()
 }

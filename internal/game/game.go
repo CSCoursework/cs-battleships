@@ -1,6 +1,8 @@
 package game
 
 import (
+	"fmt"
+	"github.com/codemicro/cs-battleships/internal/io"
 	"github.com/codemicro/cs-battleships/internal/models"
 	"math/rand"
 	"time"
@@ -30,4 +32,10 @@ func CreateOcean(oceanWidth, oceanHeight int) [][]models.OceanCell {
 		proto = append(proto, currentLine)
 	}
 	return proto
+}
+
+func Start() {
+	io.ShowOcean(Ocean)
+	cell := io.GetCell()
+	fmt.Println(cell)
 }
