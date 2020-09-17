@@ -28,7 +28,9 @@ func ShowOcean(ocean [][]models.OceanCell) {
 
 			currentCell := ocean[x][y]
 			var marker string
-			if currentCell.Occupied {
+			if currentCell.Hit {
+				marker = "!"
+			} else if currentCell.Occupied {
 				marker = "*"
 			} else {
 				marker = "-"

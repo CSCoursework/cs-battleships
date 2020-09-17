@@ -3,8 +3,11 @@ package io
 import (
 	"bufio"
 	"fmt"
+	"github.com/codemicro/cs-battleships/internal/helpers"
 	"os"
 	"regexp"
+	"strconv"
+	"strings"
 )
 
 var (
@@ -14,7 +17,7 @@ var (
 
 func init() {
 	var err error
-	cellRegex, err = regexp.Compile(`^\d+\w+$`)
+	cellRegex, err = regexp.Compile(`^\w\d$`)
 	if err != nil {
 		panic(err)
 	}
@@ -26,12 +29,16 @@ func TakeInput(prompt string) string {
 	return scanner.Text()
 }
 
-func GetCell() string {
+func GetCell() (x int, y int) {
 	for {
 		input := TakeInput("Select a cell: ")
-		fmt.Println(cellRegex.Match([]byte(input)))
 		if cellRegex.Match([]byte(input)) {
-			return input
+
+			// TODO: Bounds checks
+			x = helpers.GetCharNumber(strings.ToUpper(string(input[0])))
+			y, _ = strconv.Atoi(string(input[1])) // Hopefully the regex means we can ignore this error
+
+			return
 		}
 		fmt.Println("Invalid cell")
 	}
