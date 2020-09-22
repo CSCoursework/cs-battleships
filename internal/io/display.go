@@ -30,8 +30,8 @@ func ShowOcean(ocean [][]models.OceanCell) {
 			var marker string
 			if currentCell.Hit {
 				marker = "!"
-			} else if currentCell.Occupied {
-				marker = "*"
+			} else if currentCell.Guessed {
+				marker = "x"
 			} else {
 				marker = "-"
 			}

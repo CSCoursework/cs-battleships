@@ -34,11 +34,12 @@ func GetCell() (x int, y int) {
 		input := TakeInput("Select a cell: ")
 		if cellRegex.Match([]byte(input)) {
 
-			// TODO: Bounds checks
 			x = helpers.GetCharNumber(strings.ToUpper(string(input[0])))
 			y, _ = strconv.Atoi(string(input[1])) // Hopefully the regex means we can ignore this error
 
-			return
+			if !(x > OceanWidth || y > OceanHeight) {
+				return
+			}
 		}
 		fmt.Println("Invalid cell")
 	}

@@ -1,11 +1,14 @@
 package game
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/codemicro/cs-battleships/internal/helpers"
 	"github.com/codemicro/cs-battleships/internal/io"
 	"github.com/codemicro/cs-battleships/internal/models"
 	"math/rand"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -17,6 +20,10 @@ var (
 
 func init() {
 	Random = rand.New(rand.NewSource(time.Now().UnixNano()))
+}
+
+func SetupNewGame() {
+	Ocean = CreateOcean(io.OceanWidth, io.OceanHeight)
 }
 
 func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
@@ -110,13 +117,30 @@ func Start() {
 		if selectedCell.Occupied {
 			selectedCell.Hit = true
 			fmt.Println("You hit something!")
+		} else if selectedCell.Guessed {
+			fmt.Println("You already guessed this one!")
+		} else {
+			fmt.Println("Nothing here!")
 		}
+		selectedCell.Guessed = true
 		Ocean[x][y] = selectedCell
 		time.Sleep(time.Second)
 
 		if !AreShipsRemaining() {
+
+			helpers.ClearConsole()
+
 			fmt.Println("You hit all the ships, well done!")
-			os.Exit(0)
+			fmt.Print("Play again? y/N ")
+
+			scanner := bufio.NewScanner(os.Stdin)
+			scanner.Scan()
+			if strings.ToLower(scanner.Text()) != "y" {
+				os.Exit(0)
+			}
+
+			SetupNewGame()
+
 		}
 
 	}

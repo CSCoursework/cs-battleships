@@ -3,11 +3,18 @@ package helpers
 import (
 	"os"
 	"os/exec"
+	"runtime"
 )
 
 func ClearConsole() {
-	out, _ := exec.Command("cls").Output() // Windows only
-	_, _ = os.Stdout.Write(out)
+	var cmd *exec.Cmd
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+	cmd.Stdout = os.Stdout
+	_ = cmd.Run()
 }
 
 func GetAlphabetChar(i int) string {
