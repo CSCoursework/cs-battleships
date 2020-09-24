@@ -16,6 +16,21 @@ sudo chmod +x ./battleships
 ./battleships
 ```
 
+## Contents
+
+* Structure
+* Assorted components
+  * Clearing the console
+  * Collecting user input
+  * Numbering the board with letters
+* Game components
+  * Creating and storing an ocean
+  * Displaying the ocean 
+  * Hit detection
+* The main game loop
+  * Restarting the game
+* The entrypoint
+
 ## Structure
 
 The vast majority of the code in this project is stored in packages in the `/internal` directory, which contains the following packages:
@@ -29,9 +44,118 @@ The vast majority of the code in this project is stored in packages in the `/int
 
 Code is broken down into small functions as much as possible, to ensure that code is not duplicated and to make repeated tasks easier to do.
 
-## Creating and storing the ocean state
+## Assorted components
 
-The heart of a battleships game is the ocean, which is in this case a 10x10 grid. Each cell in the grid has three different attributes attached to it: `Occupied`, `Hit` and `Guessed`.
+### Clearing the console
+
+During the game, it will be necessary to clear the console periodically to prevent it becoming to cluttered.
+
+Unlike in C# and other languages, Go has no built in way to do this. If we want to clear the console, we have to write a function that manually calls the command.
+
+```go
+func ClearConsole() {
+	var cmd *exec.Cmd
+    // Depending on the platform we're running on, we need to choose a different command.
+	if runtime.GOOS == "windows" {
+		cmd = exec.Command("cmd", "/c", "cls")
+	} else {
+		cmd = exec.Command("clear")
+	}
+    // The output of the command is set to the current command line that we're playing the game on.
+	cmd.Stdout = os.Stdout
+	_ = cmd.Run() // Run that command and ignore any errors
+}
+```
+
+### Collecting user input
+
+To let the user play a game, they need a way to input information into it. We also need to validate this input from the user to make sure that the coordinate is a valid location on the board. All of this can be rolled into one function.
+
+```go
+var (
+	scanner   = bufio.NewScanner(os.Stdin)
+	cellRegex *regexp.Regexp
+)
+
+func init() {
+    // The init function is run once when the package is first loaded.
+	var err error
+    cellRegex, err = regexp.Compile(`^\w\d$`) // Matches: start of string, one word character, one digit, end of string. For example A7 matches, BB24 does not.
+	if err != nil {
+		panic(err) // If there's something wrong with our regex, say so and quit.
+	}
+}
+
+func TakeInput(prompt string) string {
+    // TakeInput is just a wrapper for a couple of other functions
+	fmt.Print(prompt)
+	scanner.Scan()
+	return scanner.Text()
+}
+
+func GetCell() (x int, y int) {
+    // Enter an infinite loop to ensure that we get valid input from the user
+	for {
+		input := TakeInput("Select a cell: ")
+        // See if the user's input is okay
+		if cellRegex.Match([]byte(input)) {
+
+            // Split the user input into an X and Y component. Get an integer from the letter, and convert the number to integer format from the string.
+			x = helpers.GetCharNumber(strings.ToUpper(string(input[0])))
+			y, _ = strconv.Atoi(string(input[1]))
+
+            // Check if the selected cell is within the bounds of the board.
+			if !(x > OceanWidth || y > OceanHeight) {
+				return
+			}
+		}
+		fmt.Println("Invalid cell") // Tell the user their input is invalid and loop round again to let them try again.
+	}
+}
+```
+
+Once we've got this setup, letting the user select a cell is as simple as:
+
+```go
+x, y := io.GetCell()
+```
+
+### Numbering the board with letters
+
+Coordinates (at least, in a battleships game) are comprised of a letter and a number. Internally, we're going to be referencing locations in the ocean using integers. Somehow we have to turn a letter into a number before we can use it.
+
+The best way to do this is to write two helper functions.
+
+First, a function to turn an integer (in the range ![0 <= n <= 25](writeup-images/0leqsnleqs25.gif)) into an alphabet letter. Internally, every character has an assigned number, and alphabet letters all have consecutive numbers. Knowing this, we can do the following magic to get an alphabet letter from an "index" of that letter.
+
+```go
+func GetAlphabetChar(i int) string {
+    // Cast the rune A (rune == char but in Go) to an integer to use as a starting point.
+    // Add i to that integer
+    // Turn the resultant integer back into a rune
+    // Turn that rune into a string
+   	// Return that string
+	return string(rune(int('A') + i))
+}
+```
+
+We'll also need to get an integer from an alphabet character in places. The inverse of the above function looks like this.
+
+```go
+func GetCharNumber(i string) int {
+    // Take the first character in string i and convert that to a rune
+    // Convert that rune into an int
+    // Take the integer version of rune A from the calculated int
+    // Return that value
+	return int([]rune(i)[0]) - int('A')
+}
+```
+
+## Game components
+
+### Creating and storing the ocean state
+
+The heart of a battleships game is the ocean, which is in our case is going to be a 10x10 grid. Each cell in the grid has three different attributes attached to it: `Occupied`, `Hit` and `Guessed`.
 
 This is achieved using a struct called `OceanCell`.
 
@@ -43,13 +167,13 @@ type OceanCell struct {
 }
 ```
 
-This struct is then used in the `Ocean` variable store the current state of the game. It's of type `[][]models.OceanCell`, an array of arrays of our `OceanCell` struct, however each cell requires initialisation, since the array is currently made up of nil values. To do this, we use the built in `make` function in Go, to make an array of a set length, populated with empty versions of our `OceanCell` struct.
+This struct is then used in the `Ocean` variable store the current state of the game. It's of type `[][]models.OceanCell`, which is an array of arrays of our `OceanCell` struct (Go doesn't have two-dimensional arrays).  However - just declaring the variable (`var Ocean [][]models.OceanCell`) in Go will not fill it with default values, instead just creating an empty array. To actually create a matrix of `OceanCell`s, we use the built in `make` function in Go.
 
 ```go
 func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
-	proto = make([][]models.OceanCell, oceanHeight)
+	proto = make([][]models.OceanCell, oceanHeight) // Make the top level array
 	for y := 0; y < oceanHeight; y++ {
-		proto[y] = make([]models.OceanCell, oceanWidth)
+		proto[y] = make([]models.OceanCell, oceanWidth) // Make the subarrays
 	}
 
 	// ...
@@ -57,8 +181,6 @@ func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
 	return
 }
 ```
-
-Since Go doesn't have native support for two-dimensional arrays, we have to each row manually and then add that to the main ocean array.
 
 However - this just creates an empty ocean. Battleships needs boats, right? We need to write some boat placement code.
 
@@ -139,13 +261,13 @@ func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
 }
 ```
 
-## Displaying the ocean
+### Displaying the ocean
 
-Creating and storing the ocean is all well and good, but at the moment there's no way for the user to see it. For this, we create a new function.
+Creating and storing the ocean is all well and good, but at the moment there's no way for the user to see it; we need a new function.
 
 ```go
 func ShowOcean(ocean [][]models.OceanCell) {
-	helpers.ClearConsole() // We'll get to this later
+    helpers.ClearConsole()
 
 	fmt.Print("  ")
 
@@ -184,112 +306,7 @@ func ShowOcean(ocean [][]models.OceanCell) {
 
 ```
 
-## Clearing the console
-
-To prevent the console becoming cluttered with outdated copies of the ocean, it's necessary to clear the console periodically.
-
-Unlike in C# and other languages, Go has no built in way to do this. If we want to clear the console, we have to write a function that manually calls the command.
-
-```go
-func ClearConsole() {
-	var cmd *exec.Cmd
-    // Depending on the platform we're running on, we need to choose a different command.
-	if runtime.GOOS == "windows" {
-		cmd = exec.Command("cmd", "/c", "cls")
-	} else {
-		cmd = exec.Command("clear")
-	}
-    // The output of the command is set to the current command line that we're playing the game on.
-	cmd.Stdout = os.Stdout
-	_ = cmd.Run() // Run that command and ignore any errors
-}
-```
-
-## Collecting user input
-
-To let the user play a game, they need a way to input information into it. We also need to validate this input from the user to make sure that the coordinate is a valid location on the board. All of this can be rolled into one function.
-
-```go
-var (
-	scanner   = bufio.NewScanner(os.Stdin)
-	cellRegex *regexp.Regexp
-)
-
-func init() {
-    // The init function is run once when the package is first loaded.
-	var err error
-    cellRegex, err = regexp.Compile(`^\w\d$`) // Matches: start of string, one word character, one digit, end of string. For example A7 matches, BB24 does not.
-	if err != nil {
-		panic(err) // If there's something wrong with our regex, say so and quit.
-	}
-}
-
-func TakeInput(prompt string) string {
-    // TakeInput is just a wrapper for a couple of other functions
-	fmt.Print(prompt)
-	scanner.Scan()
-	return scanner.Text()
-}
-
-func GetCell() (x int, y int) {
-    // Enter an infinite loop to ensure that we get valid input from the user
-	for {
-		input := TakeInput("Select a cell: ")
-        // See if the user's input is okay
-		if cellRegex.Match([]byte(input)) {
-
-            // Split the user input into an X and Y component. Get an integer from the letter, and convert the number to integer format from the string.
-			x = helpers.GetCharNumber(strings.ToUpper(string(input[0])))
-			y, _ = strconv.Atoi(string(input[1]))
-
-            // Check if the selected cell is within the bounds of the board.
-			if !(x > OceanWidth || y > OceanHeight) {
-				return
-			}
-		}
-		fmt.Println("Invalid cell") // Tell the user their input is invalid and loop round again to let them try again.
-	}
-}
-```
-
-Once we've got this setup, letting the user select a cell is as simple as:
-
-```go
-x, y := io.GetCell()
-```
-
-## Numbering the board with letters
-
-Coordinates (at least, in a battleships game) are comprised of a letter and a number. However, the ocean is addressed internally with integers, meaning somehow we have to turn a letter into a number before we can use it.
-
-The best way to do this is to write two helper functions.
-
-First, a function to turn an integer (in the range ![0 <= n <= 25](writeup-images/0leqsnleqs25.gif)) into an alphabet letter. Internally, every character has an assigned number, and alphabet letters all have consecutive numbers. Knowing this, we can do the following magic to get an alphabet letter from an "index" of that letter.
-
-```go
-func GetAlphabetChar(i int) string {
-    // Cast the rune A (rune == char but in Go) to an integer to use as a starting point.
-    // Add i to that integer
-    // Turn the resultant integer back into a rune
-    // Turn that rune into a string
-   	// Return that string
-	return string(rune(int('A') + i))
-}
-```
-
-We'll also need to get an integer from an alphabet character in places. The inverse of the above function looks like this.
-
-```go
-func GetCharNumber(i string) int {
-    // Take the first character in string i and convert that to a rune
-    // Convert that rune into an int
-    // Take the integer version of rune A from the calculated int
-    // Return that value
-	return int([]rune(i)[0]) - int('A')
-}
-```
-
-## Detecting if all ships are hit
+### Detecting if all ships are hit
 
 A game of battleships finishes when the player has hit all the ships, so we should probably write a function to detect this.
 
@@ -312,7 +329,7 @@ func AreShipsRemaining() (areShipsRemaining bool) {
 
 ## The main game loop
 
-Now, we can bring all the components we've written together in order to To start the game, all you have to do is a single function call. This is done to reduce the amount of code contained within the file containing the entrypoint.
+Now, we can bring all the components we've written together. In order to start the game, all you have to do is a single function call. This is done to reduce the amount of code contained within the file containing the entrypoint.
 
 ```go
 func Start() {
@@ -339,8 +356,6 @@ func Start() {
     }
 }
 ```
-
-
 
 ### Restarting the game
 
