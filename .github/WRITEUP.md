@@ -258,3 +258,74 @@ Once we've got this setup, letting the user select a cell is as simple as:
 x, y := io.GetCell()
 ```
 
+## Numbering the board with letters
+
+Coordinates (at least, in a battleships game) are comprised of a letter and a number. However, the ocean is addressed internally with integers, meaning somehow we have to turn a letter into a number before we can use it.
+
+The best way to do this is to write two helper functions.
+
+First, a function to turn an integer (in the range ![0 <= n <= 25](writeup-images/0leqsnleqs25.gif)) into an alphabet letter. Internally, every character has an assigned number, and alphabet letters all have consecutive numbers. Knowing this, we can do the following magic to get an alphabet letter from an "index" of that letter.
+
+```go
+func GetAlphabetChar(i int) string {
+    // Cast the rune A (rune == char but in Go) to an integer to use as a starting point.
+    // Add i to that integer
+    // Turn the resultant integer back into a rune
+    // Turn that rune into a string
+   	// Return that string
+	return string(rune(int('A') + i))
+}
+```
+
+We'll also need to get an integer from an alphabet character in places. The inverse of the above function looks like this.
+
+```go
+func GetCharNumber(i string) int {
+    // Take the first character in string i and convert that to a rune
+    // Convert that rune into an int
+    // Take the integer version of rune A from the calculated int
+    // Return that value
+	return int([]rune(i)[0]) - int('A')
+}
+```
+
+## Detecting if all ships are hit
+
+A game of battleships finishes when the player has hit all the ships, so we should probably write a function to detect this.
+
+```go
+func AreShipsRemaining() (areShipsRemaining bool) {
+	// Iterate over every cell in the ocean, and if even one is occupied and not hit, return true.
+    // Else return false.
+	for y := 0; y < io.OceanHeight; y++ {
+		for x := 0; x < io.OceanWidth; x++ {
+			if Ocean[x][y].Occupied && !Ocean[x][y].Hit {
+				areShipsRemaining = true
+				return
+			}
+		}
+	}
+
+	return
+}
+```
+
+## Restarting the game
+
+Once all ships have been hit, the user can choose if they'd like to play another round. Because the code used to generate a new ocean with random ships is its own separate function, it's trivial to generate a new ocean and restart the game with that.
+
+```go
+if !AreShipsRemaining() {
+
+	helpers.ClearConsole()
+
+	fmt.Println("You hit all the ships, well done!")
+
+	if strings.ToLower(io.TakeInput("Play again? y/N ")) != "y" {
+		os.Exit(0)
+	}
+
+    SetupNewGame()
+}
+```
+
