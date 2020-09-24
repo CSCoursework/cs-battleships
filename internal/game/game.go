@@ -6,7 +6,6 @@ import (
 	"github.com/codemicro/cs-battleships/internal/io"
 	"github.com/codemicro/cs-battleships/internal/models"
 	"math/rand"
-	"os"
 	"strings"
 	"time"
 )
@@ -129,7 +128,7 @@ func Start() {
 			fmt.Println("You hit all the ships, well done!")
 
 			if strings.ToLower(io.TakeInput("Play again? y/N ")) != "y" {
-				os.Exit(0)
+				return
 			}
 
 			SetupNewGame()
