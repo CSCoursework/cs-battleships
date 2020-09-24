@@ -1,7 +1,6 @@
 package game
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/codemicro/cs-battleships/internal/helpers"
 	"github.com/codemicro/cs-battleships/internal/io"
@@ -128,11 +127,8 @@ func Start() {
 			helpers.ClearConsole()
 
 			fmt.Println("You hit all the ships, well done!")
-			fmt.Print("Play again? y/N ")
 
-			scanner := bufio.NewScanner(os.Stdin)
-			scanner.Scan()
-			if strings.ToLower(scanner.Text()) != "y" {
+			if strings.ToLower(io.TakeInput("Play again? y/N ")) != "y" {
 				os.Exit(0)
 			}
 
