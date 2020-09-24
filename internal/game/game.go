@@ -27,12 +27,9 @@ func SetupNewGame() {
 }
 
 func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
+	proto = make([][]models.OceanCell, oceanHeight)
 	for y := 0; y < oceanHeight; y++ {
-		var currentLine []models.OceanCell
-		for x := 0; x < oceanWidth; x++ {
-			currentLine = append(currentLine, models.OceanCell{})
-		}
-		proto = append(proto, currentLine)
+		proto[y] = make([]models.OceanCell, oceanWidth)
 	}
 
 	for _, shipLen := range shipsToPlace {
