@@ -310,22 +310,86 @@ func AreShipsRemaining() (areShipsRemaining bool) {
 }
 ```
 
-## Restarting the game
+## The main game loop
+
+Now, we can bring all the components we've written together in order to To start the game, all you have to do is a single function call. This is done to reduce the amount of code contained within the file containing the entrypoint.
+
+```go
+func Start() {
+	for {
+        io.ShowOcean(Ocean)
+		x, y := io.GetCell() // Let the user select a year.
+		selectedCell := Ocean[x][y] // Here, Golang does not return a pointer to that value, so we cannot modify the cell value using Ocean[x][y].Hit = true. We have to make a copy of this value and reassign it to the array when we're done.
+        
+		if selectedCell.Occupied {
+			selectedCell.Hit = true
+			fmt.Println("You hit something!")
+		} else if selectedCell.Guessed {
+			fmt.Println("You already guessed this one!")
+		} else {
+			fmt.Println("Nothing here!")
+		}
+        
+		selectedCell.Guessed = true
+		Ocean[x][y] = selectedCell
+		time.Sleep(time.Second) // So the user has a moment to see the message that's been printed out before the screen is cleared
+
+		// ...
+        
+    }
+}
+```
+
+
+
+### Restarting the game
 
 Once all ships have been hit, the user can choose if they'd like to play another round. Because the code used to generate a new ocean with random ships is its own separate function, it's trivial to generate a new ocean and restart the game with that.
 
 ```go
-if !AreShipsRemaining() {
+func Start() {
+    for {
+        
+        // ...
+    
+	    if !AreShipsRemaining() {
 
-	helpers.ClearConsole()
+			helpers.ClearConsole()
 
-	fmt.Println("You hit all the ships, well done!")
+			fmt.Println("You hit all the ships, well done!")
 
-	if strings.ToLower(io.TakeInput("Play again? y/N ")) != "y" {
-		os.Exit(0)
+			if strings.ToLower(io.TakeInput("Play again? y/N ")) != "y" {
+				return
+			}
+
+			SetupNewGame()
+
+		}
 	}
-
-    SetupNewGame()
 }
 ```
 
+## The entrypoint
+
+With that, we can write the entrypoint of our program.
+
+```go
+package main
+
+import (
+	"github.com/codemicro/cs-battleships/internal/game"
+)
+
+func init() {
+	game.SetupNewGame()
+}
+
+func main() {
+	game.Start()
+}
+
+```
+
+Then we can build the game, and run it!
+
+![The game](writeup-images/game.png)
