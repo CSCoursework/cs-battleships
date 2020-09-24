@@ -27,6 +27,8 @@ The vast majority of the code in this project is stored in packages in the `/int
 * `models`: contains the structs used throughout the app
   * Specifically, it's just one model - `OceanCell`
 
+Code is broken down into small functions as much as possible, to ensure that code is not duplicated and to make repeated tasks easier to do.
+
 ## Creating and storing the ocean state
 
 The heart of a battleships game is the ocean, which is in this case a 10x10 grid. Each cell in the grid has three different attributes attached to it: `Occupied`, `Hit` and `Guessed`.
@@ -41,16 +43,13 @@ type OceanCell struct {
 }
 ```
 
-This alone isn't much help - to organise the ocean as a whole, the `Ocean` variable is used. It's of type `[][]models.OceanCell`, an array of arrays of our `OceanCell` struct, but each cell requires initialisation, since the array is currently made up of nil values. To do this, we have to manually create each ocean cell.
+This struct is then used in the `Ocean` variable store the current state of the game. It's of type `[][]models.OceanCell`, an array of arrays of our `OceanCell` struct, however each cell requires initialisation, since the array is currently made up of nil values. To do this, we use the built in `make` function in Go, to make an array of a set length, populated with empty versions of our `OceanCell` struct.
 
 ```go
 func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
+	proto = make([][]models.OceanCell, oceanHeight)
 	for y := 0; y < oceanHeight; y++ {
-		var currentLine []models.OceanCell
-		for x := 0; x < oceanWidth; x++ {
-			currentLine = append(currentLine, models.OceanCell{})
-		}
-		proto = append(proto, currentLine)
+		proto[y] = make([]models.OceanCell, oceanWidth)
 	}
 
 	// ...
@@ -59,7 +58,7 @@ func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
 }
 ```
 
-Since Go doesn't have native support for two-dimensional arrays, we first create subarrays and then append those to the main ocean array.
+Since Go doesn't have native support for two-dimensional arrays, we have to each row manually and then add that to the main ocean array.
 
 However - this just creates an empty ocean. Battleships needs boats, right? We need to write some boat placement code.
 
@@ -69,6 +68,7 @@ func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
     // ...
     
     // shipsToPlace is an array of integers that represent ships to be placed in the ocean.
+    // var shipsToPlace = []int{5, 4, 3, 3, 2}
 	for _, shipLen := range shipsToPlace {
 		// First, a random boat orientation is chosen.
 		isShipHorizontal := Random.Intn(2) == 0
@@ -141,7 +141,7 @@ func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
 
 ## Displaying the ocean
 
-Creating and storing the ocean is all well and good, but at the moment there's no way for the user to see it. For this, I think we need a new function.
+Creating and storing the ocean is all well and good, but at the moment there's no way for the user to see it. For this, we create a new function.
 
 ```go
 func ShowOcean(ocean [][]models.OceanCell) {
@@ -201,7 +201,60 @@ func ClearConsole() {
 	}
     // The output of the command is set to the current command line that we're playing the game on.
 	cmd.Stdout = os.Stdout
-	_ = cmd.Run()
+	_ = cmd.Run() // Run that command and ignore any errors
 }
+```
+
+## Collecting user input
+
+To let the user play a game, they need a way to input information into it. We also need to validate this input from the user to make sure that the coordinate is a valid location on the board. All of this can be rolled into one function.
+
+```go
+var (
+	scanner   = bufio.NewScanner(os.Stdin)
+	cellRegex *regexp.Regexp
+)
+
+func init() {
+    // The init function is run once when the package is first loaded.
+	var err error
+    cellRegex, err = regexp.Compile(`^\w\d$`) // Matches: start of string, one word character, one digit, end of string. For example A7 matches, BB24 does not.
+	if err != nil {
+		panic(err) // If there's something wrong with our regex, say so and quit.
+	}
+}
+
+func TakeInput(prompt string) string {
+    // TakeInput is just a wrapper for a couple of other functions
+	fmt.Print(prompt)
+	scanner.Scan()
+	return scanner.Text()
+}
+
+func GetCell() (x int, y int) {
+    // Enter an infinite loop to ensure that we get valid input from the user
+	for {
+		input := TakeInput("Select a cell: ")
+        // See if the user's input is okay
+		if cellRegex.Match([]byte(input)) {
+
+            // Split the user input into an X and Y component. Get an integer from the letter, and convert the number to integer format from the string.
+			x = helpers.GetCharNumber(strings.ToUpper(string(input[0])))
+			y, _ = strconv.Atoi(string(input[1]))
+
+            // Check if the selected cell is within the bounds of the board.
+			if !(x > OceanWidth || y > OceanHeight) {
+				return
+			}
+		}
+		fmt.Println("Invalid cell") // Tell the user their input is invalid and loop round again to let them try again.
+	}
+}
+```
+
+Once we've got this setup, letting the user select a cell is as simple as:
+
+```go
+x, y := io.GetCell()
 ```
 
