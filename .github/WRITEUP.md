@@ -33,6 +33,7 @@ sudo chmod +x ./battleships
   * Restarting the game
 * The entrypoint
 * What could be improved?
+* Evaluation
 
 ## What is battleships?
 
