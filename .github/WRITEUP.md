@@ -18,7 +18,9 @@ sudo chmod +x ./battleships
 
 ## Contents
 
-* Structure
+* What is battleships?
+* Success criteria
+* Project structure
 * Assorted components
   * Clearing the console
   * Collecting user input
@@ -30,19 +32,38 @@ sudo chmod +x ./battleships
 * The main game loop
   * Restarting the game
 * The entrypoint
+* What could be improved?
 
-## Structure
+## What is battleships?
+
+Battleships is typically a two player game where players compete to destroy the other players' ships by guessing their locations. The first player to destroy the other's ships is the winner.
+
+This project is a single player version of battleships, where the locations of boats are randomly generated. The job of the player is to guess their location, and the game finishes when all boats have been located.
+
+## Success criteria
+
+* The program should automatically generate an ocean with boats in random locations
+* The program should display the ocean using text characters
+* The program should allow the user to input guesses and feedback on if those guesses have been successful in finding a ship
+
+## Project structure
 
 The vast majority of the code in this project is stored in packages in the `/internal` directory, which contains the following packages:
 
-* `game`: contains logic related to playing the game and managing the scoreboard.
+* `game`: contains logic related to playing the game and managing the ocean.
 * `helpers`: contains functions required in different places in the game that don't really fit into any of the other packages
   * For example, functions to clear the console and functions to convert letters into numbers are contained in this package.
 * `io`: contains functions to aid with displaying content to and collecting input from the user.
 * `models`: contains the structs used throughout the app
-  * Specifically, it's just one model - `OceanCell`
+  * Specifically, it's just one struct - `OceanCell`
 
-Code is broken down into small functions as much as possible, to ensure that code is not duplicated and to make repeated tasks easier to do.
+Code is broken down into small functions as much as possible, to ensure that code is not duplicated and to make reusing code easier.
+
+In order to prevent import loops, a sort of package hierarchy is in place: the `main` package (seen below as `/cmd/battleships`) imports the `game` package, which imports `helpers`, `io` and `models`. Those packages cannot import from `game` as that would cause an import loop, but they can import from each other. The import graph of the project eded up looking like this:
+
+![Import graph](writeup-images/import-graph.png)
+
+Let's get to writing some components!
 
 ## Assorted components
 
@@ -50,9 +71,13 @@ Code is broken down into small functions as much as possible, to ensure that cod
 
 During the game, it will be necessary to clear the console periodically to prevent it becoming to cluttered.
 
-Unlike in C# and other languages, Go has no built in way to do this. If we want to clear the console, we have to write a function that manually calls the command.
+Unlike in C# and other languages, Go has no built in way to do this. If we want to clear the console, we have to write a function that manually calls the system command.
 
 ```go
+package helpers
+
+// ...
+
 func ClearConsole() {
 	var cmd *exec.Cmd
     // Depending on the platform we're running on, we need to choose a different command.
@@ -69,9 +94,13 @@ func ClearConsole() {
 
 ### Collecting user input
 
-To let the user play a game, they need a way to input information into it. We also need to validate this input from the user to make sure that the coordinate is a valid location on the board. All of this can be rolled into one function.
+If a user is going to play the game, they need a way to input information into it. This will then need to be validated to make sure that the coordinate provided is a valid location on the board. All of this can be rolled into one function.
 
 ```go
+package io
+
+// ...
+
 var (
 	scanner   = bufio.NewScanner(os.Stdin)
 	cellRegex *regexp.Regexp
@@ -126,9 +155,13 @@ Coordinates (at least, in a battleships game) are comprised of a letter and a nu
 
 The best way to do this is to write two helper functions.
 
-First, a function to turn an integer (in the range ![0 <= n <= 25](writeup-images/0leqsnleqs25.gif)) into an alphabet letter. Internally, every character has an assigned number, and alphabet letters all have consecutive numbers. Knowing this, we can do the following magic to get an alphabet letter from an "index" of that letter.
+First we should write a function to turn an integer (in the range ![0 <= n <= 25](writeup-images/0leqsnleqs25.gif)) into an alphabet letter. In every programming language, every character has an assigned number, and alphabet letters all have consecutive numbers. Knowing this, we can do the following magic to get an alphabet letter from an "index" of that letter.
 
 ```go
+package helpers
+
+// ...
+
 func GetAlphabetChar(i int) string {
     // Cast the rune A (rune == char but in Go) to an integer to use as a starting point.
     // Add i to that integer
@@ -142,6 +175,10 @@ func GetAlphabetChar(i int) string {
 We'll also need to get an integer from an alphabet character in places. The inverse of the above function looks like this.
 
 ```go
+package helpers
+
+// ...
+
 func GetCharNumber(i string) int {
     // Take the first character in string i and convert that to a rune
     // Convert that rune into an int
@@ -150,6 +187,8 @@ func GetCharNumber(i string) int {
 	return int([]rune(i)[0]) - int('A')
 }
 ```
+
+By adding these two functions, we avoid the need to have an array that contains all the letters of the alphabet.
 
 ## Game components
 
@@ -160,6 +199,10 @@ The heart of a battleships game is the ocean, which is in our case is going to b
 This is achieved using a struct called `OceanCell`.
 
 ```go
+package models
+
+// ...
+
 type OceanCell struct {
 	Hit      bool
 	Occupied bool
@@ -170,6 +213,10 @@ type OceanCell struct {
 This struct is then used in the `Ocean` variable store the current state of the game. It's of type `[][]models.OceanCell`, which is an array of arrays of our `OceanCell` struct (Go doesn't have two-dimensional arrays).  However - just declaring the variable (`var Ocean [][]models.OceanCell`) in Go will not fill it with default values, instead just creating an empty array. To actually create a matrix of `OceanCell`s, we use the built in `make` function in Go.
 
 ```go
+package game
+
+// ...
+
 func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
 	proto = make([][]models.OceanCell, oceanHeight) // Make the top level array
 	for y := 0; y < oceanHeight; y++ {
@@ -182,15 +229,20 @@ func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
 }
 ```
 
-However - this just creates an empty ocean. Battleships needs boats, right? We need to write some boat placement code.
+However - this just creates an empty ocean. A game of battleships needs boats, right? We need to write some boat placement code.
 
 ```go
+package game
+
+// ...
+
+var shipsToPlace = []int{5, 4, 3, 3, 2}
+
 func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
     
     // ...
     
     // shipsToPlace is an array of integers that represent ships to be placed in the ocean.
-    // var shipsToPlace = []int{5, 4, 3, 3, 2}
 	for _, shipLen := range shipsToPlace {
 		// First, a random boat orientation is chosen.
 		isShipHorizontal := Random.Intn(2) == 0
@@ -263,13 +315,17 @@ func CreateOcean(oceanWidth, oceanHeight int) (proto [][]models.OceanCell) {
 
 ### Displaying the ocean
 
-Creating and storing the ocean is all well and good, but at the moment there's no way for the user to see it; we need a new function.
+Creating and storing the ocean is all well and good, but at the moment there's no way for the user to see it.
 
 ```go
+package io
+
+// ...
+
 func ShowOcean(ocean [][]models.OceanCell) {
     helpers.ClearConsole()
 
-	fmt.Print("  ")
+	fmt.Print("  ") // In order to make everything line up nicely
 
     // Print the letters at the top of the board
 	for i := 0; i < len(ocean); i++ {
@@ -296,7 +352,7 @@ func ShowOcean(ocean [][]models.OceanCell) {
 			} else {
 				marker = "-"
 			}
-            // Print out the marker (with some padding in)
+            // Print out the marker (with some padding)
 			fmt.Printf(" %s ", marker)
 
 		}
@@ -308,9 +364,13 @@ func ShowOcean(ocean [][]models.OceanCell) {
 
 ### Detecting if all ships are hit
 
-A game of battleships finishes when the player has hit all the ships, so we should probably write a function to detect this.
+Our game of battleships finishes when the player has hit all the ships, so we need a way to detect this.
 
 ```go
+package game
+
+// ...
+
 func AreShipsRemaining() (areShipsRemaining bool) {
 	// Iterate over every cell in the ocean, and if even one is occupied and not hit, return true.
     // Else return false.
@@ -329,9 +389,13 @@ func AreShipsRemaining() (areShipsRemaining bool) {
 
 ## The main game loop
 
-Now, we can bring all the components we've written together. In order to start the game, all you have to do is a single function call. This is done to reduce the amount of code contained within the file containing the entrypoint.
+Now, we can bring all the components we've written together. In order to start the game, all you have to do is a single function call. Doing this allows us to reduce the amount of code in the file containing the entrypoint, which is good practice in Go.
 
 ```go
+package game
+
+// ...
+
 func Start() {
 	for {
         io.ShowOcean(Ocean)
@@ -362,6 +426,10 @@ func Start() {
 Once all ships have been hit, the user can choose if they'd like to play another round. Because the code used to generate a new ocean with random ships is its own separate function, it's trivial to generate a new ocean and restart the game with that.
 
 ```go
+package game
+
+// ...
+
 func Start() {
     for {
         
@@ -408,3 +476,22 @@ func main() {
 Then we can build the game, and run it!
 
 ![The game](writeup-images/game.png)
+
+## What could be improved?
+
+* A scoring system could be added to record the amount of guesses a player takes to finish the game
+  * This could be stored as JSON or similar and then used to show a leaderboard
+* The displayed board could be made to look better using a variety of characters like █ and ▃
+* The displayed board could have colours
+* More boat sizes could be added/randomly generated to give the more variation in the game
+
+## Evaluation
+
+All in all, the program produced has met and exceeded the success criteria.
+
+* The program should automatically generate an ocean with boats in random locations
+  * This has been exceeded with the addition of not just placing single cell boats, but boats of varying sizes.
+* The program should display the ocean using text characters
+  * This has been met.
+* The program should allow the user to input guesses and feedback on if those guesses have been successful in finding a ship
+  * This has been met.
