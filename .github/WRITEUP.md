@@ -1,6 +1,6 @@
 # Battleships
 
-Golang 1.14, `github.com/codemicro/cs-battleships`
+Golang 1.14, `github.com/codemicro/cs-battleships`, 321 lines of code
 
 #### To build
 
@@ -181,7 +181,7 @@ package helpers
 // ...
 
 func GetCharNumber(i string) int {
-    // Take the first character in string i and convert that to a rune
+    // Convert the string to an array of runes and select the first one
     // Convert that rune into an int
     // Take the integer version of rune A from the calculated int
     // Return that value
@@ -211,7 +211,7 @@ type OceanCell struct {
 }
 ```
 
-This struct is then used in the `Ocean` variable store the current state of the game. It's of type `[][]models.OceanCell`, which is an array of arrays of our `OceanCell` struct (Go doesn't have two-dimensional arrays).  However - just declaring the variable (`var Ocean [][]models.OceanCell`) in Go will not fill it with default values, instead just creating an empty array. To actually create a matrix of `OceanCell`s, we use the built in `make` function in Go.
+This struct is then used in the `Ocean` variable to store the current state of the game. It's of type `[][]models.OceanCell`, which is an array of arrays of our `OceanCell` struct (Go doesn't have two-dimensional arrays). However - just declaring the variable (`var Ocean [][]models.OceanCell`) in Go will not fill it with default values, instead just creating an empty array. To actually create a matrix of `OceanCell`s, we use the built in `make` function in Go.
 
 ```go
 package game
@@ -390,7 +390,7 @@ func AreShipsRemaining() (areShipsRemaining bool) {
 
 ## The main game loop
 
-Now, we can bring all the components we've written together. In order to start the game, all you have to do is a single function call. Doing this allows us to reduce the amount of code in the file containing the entrypoint, which is good practice in Go.
+Now, we can bring all the components we've written together. In order to start the game, all you have to do is a single function call. Doing this allows us to reduce the amount of code in the file containing the entrypoint.
 
 ```go
 package game
@@ -485,6 +485,9 @@ Then we can build the game, and run it!
 * The displayed board could be made to look better using a variety of characters like █ and ▃
 * The displayed board could have colours
 * More boat sizes could be added/randomly generated to give the more variation in the game
+* The `models` package shouldn't exist.
+  * Ideally, the `OceanCell` struct should be contained within the `game` package since that's where it's used. As a result, the `models` package kinda doesn't need to be there.
+  * If this were to be implemented, other parts of the project would need to be restructured to avoid a circular import.
 
 ## Evaluation
 
